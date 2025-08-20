@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 
 
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000", "http://localhost:8080", "https://hackathontennis-1022559513291.asia-southeast1.run.app/"})
 @RestController
 @RequestMapping("/api")
 public class SecureController {
