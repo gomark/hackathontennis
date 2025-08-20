@@ -181,15 +181,21 @@ public class SecureController {
         JsonObject returnJson = new JsonObject();
 
         try {
+            long userPk = (Long) request.getAttribute("user_pk");
             JsonObject jsonEntity = gson.fromJson(entity, JsonObject.class);
             Long courtId = jsonEntity.get("courtId").getAsLong();
             String bookingDateStt = jsonEntity.get("date").getAsString();
+            LocalDate bookedDate = LocalDate.parse(bookingDateStt);
             JsonArray jaTimeSlots = jsonEntity.get("timeSlots").getAsJsonArray();
 
+            // For loop for jaTimeSlots to get Long value
+            for (int i = 0; i < jaTimeSlots.size(); i++) {
+                Long bookedHour = jaTimeSlots.get(i).getAsLong();
+                
+                Booking booking = new Booking(courtId, userPk, bookedHour.intValue(), bookedDate);
+                this.bookingService.save(booking);
+            }
             
-
-            long userPk = (Long) request.getAttribute("user_pk");
-
             returnJson.addProperty("status", "OK");
             re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
         } catch (Exception e) {
