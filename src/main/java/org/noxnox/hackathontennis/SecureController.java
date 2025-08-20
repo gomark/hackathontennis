@@ -53,9 +53,10 @@ public class SecureController {
     private Booking getBooked(List<Booking> bookings, int hh, long court) {
         for (Booking b: bookings) {
             
-            logger.info(b.toString());
+            
             if ( (b.getBookedHour() == hh) && (b.getCourt() == court) ) {
                 logger.info("matched!");
+                logger.info(b.toString());
                 return(b);
             }
         }
@@ -82,7 +83,7 @@ public class SecureController {
             JsonArray ja = new JsonArray();
             int i;
             for (i = 6; i < 22; i++) {
-                logger.info("checking hh=" + String.valueOf(i) + ", court=" + court + ", bookedDate=" + bookingDate.toString());
+                //logger.info("checking hh=" + String.valueOf(i) + ", court=" + court + ", bookedDate=" + bookingDate.toString());
                 JsonObject jSlot = new JsonObject();
                 jSlot.addProperty("id", String.valueOf(i));
                 
@@ -171,14 +172,24 @@ public class SecureController {
     
 
     @PostMapping("/bookings")
-    public ResponseEntity<String> doBooking(@RequestBody String entity) {
+    public ResponseEntity<String> doBooking(HttpServletRequest request, @RequestBody String entity) {
         logger.info("secured booking...");
+        logger.info(entity);
         Gson gson = new Gson();
         gson = new GsonBuilder().registerTypeAdapter(OffsetDateTime.class, new OffsetDateTimeAdapter()).create();
         ResponseEntity<String> re = null;
         JsonObject returnJson = new JsonObject();
 
         try {
+            JsonObject jsonEntity = gson.fromJson(entity, JsonObject.class);
+            Long courtId = jsonEntity.get("courtId").getAsLong();
+            String bookingDateStt = jsonEntity.get("date").getAsString();
+            JsonArray jaTimeSlots = jsonEntity.get("timeSlots").getAsJsonArray();
+
+            
+
+            long userPk = (Long) request.getAttribute("user_pk");
+
             returnJson.addProperty("status", "OK");
             re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
         } catch (Exception e) {
