@@ -85,4 +85,15 @@ public class Court {
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+    
+    @Override
+    public String toString() {
+        return "Court{" +
+                "primaryKey=" + primaryKey +
+                ", courtName='" + courtName + '\'' +
+                ", courtDesc='" + courtDesc + '\'' +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                '}';
+    }
 }

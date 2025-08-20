@@ -117,4 +117,17 @@ public class User {
     public void setTenantId(String tenantId) {
         this.tenantId = tenantId;
     }
+    
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", googleUid='" + googleUid + '\'' +
+                ", email='" + email + '\'' +
+                ", displayName='" + displayName + '\'' +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                ", tenantId='" + tenantId + '\'' +
+                '}';
+    }
 }
