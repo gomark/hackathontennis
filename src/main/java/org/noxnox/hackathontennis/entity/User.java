@@ -1,4 +1,4 @@
-package org.noxnox.hackathontennis;
+package org.noxnox.hackathontennis.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;

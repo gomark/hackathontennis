@@ -6,6 +6,8 @@ import java.util.Optional;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.noxnox.hackathontennis.entity.User;
+import org.noxnox.hackathontennis.service.UserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -24,6 +26,9 @@ public class AuthInterceptor implements HandlerInterceptor {
     
     @Autowired
     private TenantAwareFirebaseAuth auth;
+    
+    @Autowired
+    private UserService userService;
 
     public AuthInterceptor() {
 
@@ -65,7 +70,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 logger.info("here1");
 
                 long userPk;
-                /*
+                
                 Optional<User> user = this.userService.findByEmail(decodedToken.getEmail());
                 if (user.isPresent() == false) {
                     User newUser = this.userService.createUser(decodedToken.getUid(), decodedToken.getEmail(), decodedToken.getName(), decodedToken.getTenantId(), this.getProvider(decodedToken));
@@ -77,17 +82,6 @@ public class AuthInterceptor implements HandlerInterceptor {
                     request.setAttribute("user_pk", userPk);
                 }
 
-                // Then, check subscriptions. if not exist, start with free trial
-                List<Subscription> l = this.subscriptionService.findActiveSubscriptionsByUser(userPk);
-                if (l.isEmpty()) {
-                    // Create free subscription package
-                    Package freeTrialPackage = this.packageService.findById(2L).orElse(null);
-                    this.subscriptionService.createSubscription(userPk, freeTrialPackage.getPrimaryKey());
-                    logger.info("not found subscription, create the new one");
-                } else {
-                    logger.info("found subscription.");
-                }
-                */
             } else {
 
                 response.setStatus(401);
