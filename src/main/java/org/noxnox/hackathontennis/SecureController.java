@@ -1,5 +1,6 @@
 package org.noxnox.hackathontennis;
 
+
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -11,18 +12,24 @@ import org.noxnox.hackathontennis.entity.Court;
 import org.noxnox.hackathontennis.service.BookingService;
 import org.noxnox.hackathontennis.service.CourtService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -247,25 +254,121 @@ public class SecureController {
     }
 
     @PostMapping("/createAgentSession")
-    public ResponseEntity<String> createAgentSession(HttpServletRequest request) {
+    public ResponseEntity<String> createAgentSession(HttpServletRequest request, @RequestBody String entity) {
         Gson gson = new Gson();
         gson = new GsonBuilder().registerTypeAdapter(OffsetDateTime.class, new OffsetDateTimeAdapter()).create();
         ResponseEntity<String> re = null;
         JsonObject returnJson = new JsonObject();
+
+        logger.info("createAgentSession:entity=" + entity);
         
         try {
+            
             long userPk = (Long) request.getAttribute("user_pk");
             String sessionId = "sessions_" + String.valueOf(userPk);
-            String url = System.getenv("HKT_AGENT_URL") + "/apps/my-first-app/users/" + String.valueOf(userPk) + "/sessions/" + sessionId;
+            String url = System.getenv("HKT_AGENT_URL") + "/apps/" + System.getenv("AGENT_APP_NAME") + "/users/" + String.valueOf(userPk) + "/sessions/" + sessionId;
 
             // Post to {url} with payload '{}'
             RestTemplate restTemplate = new RestTemplate();
 
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> httpEntity = new HttpEntity<>(entity, headers);
+
             // 
-            ResponseEntity<String> response = restTemplate.postForEntity(url, "", String.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, httpEntity, String.class);
             logger.info("Agent Create Session Response: " + response.getBody());            
             // Log the result of POST
 
+
+            returnJson.addProperty("status", "OK");
+            re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
+            logger.info("createAgentSession success with " + entity);
+        } catch (Exception e) {
+            if (e instanceof HttpServerErrorException) {
+                HttpServerErrorException he = (HttpServerErrorException) e;
+
+                returnJson.addProperty("message", he.getResponseBodyAsString());
+            } else {
+                returnJson.addProperty("message", e.getMessage());
+            }
+
+            logger.error(e, e);
+            returnJson.addProperty("status", "ERROR");        
+            re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.INTERNAL_SERVER_ERROR);                
+        }
+
+        return re;
+    }
+
+    @PostMapping("/chat")
+    public ResponseEntity<String> doChat(HttpServletRequest request, @RequestBody String entity) {
+        Gson gson = new Gson();
+        gson = new GsonBuilder().registerTypeAdapter(OffsetDateTime.class, new OffsetDateTimeAdapter()).create();
+        ResponseEntity<String> re = null;
+        JsonObject returnJson = new JsonObject();
+
+        logger.info("doChat: " + entity);
+        
+        try {
+            JsonObject jsonEntity = gson.fromJson(entity, JsonObject.class);
+            String message = jsonEntity.get("message").getAsString();
+            long userPk = (Long) request.getAttribute("user_pk");
+            String sessionId = "sessions_" + String.valueOf(userPk);
+
+            JsonObject jPayload = new JsonObject();
+            jPayload.addProperty("appName", System.getenv("AGENT_APP_NAME"));
+            jPayload.addProperty("userId", String.valueOf(userPk));
+            jPayload.addProperty("sessionId", sessionId);
+
+            JsonObject jMessage = new JsonObject();
+            JsonArray jaParts = new JsonArray();
+            JsonObject jPart = new JsonObject();
+            jPart.addProperty("text", message);
+            jaParts.add(jPart);
+            jMessage.add("parts", jaParts);
+            jMessage.addProperty("role", "user");
+            jPayload.add("newMessage", jMessage);
+            jPayload.addProperty("streaming", false);
+
+            JsonObject stateDelta = new JsonObject();
+            stateDelta.add("additionalProp1", new JsonObject());
+            //jPayload.add("stateDelta", stateDelta);
+
+            String jsonString = gson.toJson(jPayload);
+            String url = System.getenv("HKT_AGENT_URL") + "/run";
+            logger.info("posting: " + jsonString + " to:" + url);
+            // Prepare HTTP POST
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> req = new HttpEntity<>(jsonString, headers);
+            
+            ResponseEntity<String> response = restTemplate.postForEntity(url, req, String.class);
+            logger.info("response:" + response.getBody());
+
+            JsonArray rootArray = JsonParser.parseString(response.getBody()).getAsJsonArray();
+            StringBuilder sb = new StringBuilder();
+
+            for (JsonElement rootElem : rootArray) {
+                JsonObject rootObj = rootElem.getAsJsonObject();
+                if (rootObj.has("content")) {
+                    JsonObject content = rootObj.getAsJsonObject("content");
+                    if (content.has("parts")) {
+                        JsonArray parts = content.getAsJsonArray("parts");
+                        for (JsonElement partElem : parts) {
+                            JsonObject partObj = partElem.getAsJsonObject();
+                            if (partObj.has("text")) {
+                                sb.append(partObj.get("text").getAsString());
+                            }
+                        }
+                    }
+                }
+            }
+            String allText = sb.toString();
+            logger.info("allText=" + allText);
+
+            returnJson.addProperty("response", allText);
 
             returnJson.addProperty("status", "OK");
             re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
@@ -283,8 +386,10 @@ public class SecureController {
             re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.INTERNAL_SERVER_ERROR);                
         }
 
+
         return re;
     }
+    
     
 
     @GetMapping("/checkAgentSession")
@@ -297,7 +402,7 @@ public class SecureController {
         try {
             long userPk = (Long) request.getAttribute("user_pk");
             String sessionId = "sessions_" + String.valueOf(userPk);
-            String url = System.getenv("HKT_AGENT_URL") + "/apps/my-first-app/users/" + String.valueOf(userPk) + "/sessions/" + sessionId;
+            String url = System.getenv("HKT_AGENT_URL") + "/apps/" + System.getenv("AGENT_APP_NAME") + "/users/" + String.valueOf(userPk) + "/sessions/" + sessionId;
 
             // perform HTTP GET to {url}
             // Create a new RestTemplate instance
@@ -305,6 +410,8 @@ public class SecureController {
 
             // Make the GET request and check HTTP status
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+
+            logger.info("checkAgentStatus HTTP=" + response.getStatusCode().value());
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 returnJson.addProperty("found", true);
@@ -320,6 +427,16 @@ public class SecureController {
             re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
         } catch (Exception e) {
             returnJson.addProperty("found", false);
+
+            if (e instanceof HttpClientErrorException) {
+                HttpClientErrorException he = (HttpClientErrorException) e;
+                if (he.getStatusCode().value() == 404) {
+                    
+                    re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.NOT_FOUND);
+                    return(re);                
+                }
+            }
+
             if (e instanceof HttpServerErrorException) {
                 HttpServerErrorException he = (HttpServerErrorException) e;
                 logger.info(he.getStatusCode().value());
