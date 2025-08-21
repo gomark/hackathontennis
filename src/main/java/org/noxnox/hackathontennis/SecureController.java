@@ -390,6 +390,63 @@ public class SecureController {
         return re;
     }
     
+    @GetMapping("/deleteAgentSession")
+    public ResponseEntity<String> deleteAgentSession(HttpServletRequest request) {
+        Gson gson = new Gson();
+        gson = new GsonBuilder().registerTypeAdapter(OffsetDateTime.class, new OffsetDateTimeAdapter()).create();
+        ResponseEntity<String> re = null;
+        JsonObject returnJson = new JsonObject();
+
+        logger.info("deleteAgentSession..");
+
+        try {
+            long userPk = (Long) request.getAttribute("user_pk");
+            String sessionId = "sessions_" + String.valueOf(userPk);
+            String url = System.getenv("HKT_AGENT_URL") + "/apps/" + System.getenv("AGENT_APP_NAME") + "/users/" + String.valueOf(userPk) + "/sessions/" + sessionId;
+
+            // implement HTTP delete to {url}
+            RestTemplate restTemplate = new RestTemplate();
+            restTemplate.delete(url);
+            logger.info("Agent Session Deleted: " + sessionId);
+            
+            returnJson.addProperty("found", true);
+            returnJson.addProperty("status", "OK");            
+            re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
+            logger.info("deleteAgentSession.. done");       
+        } catch (Exception e) {
+            returnJson.addProperty("found", false);
+
+            if (e instanceof HttpClientErrorException) {
+                HttpClientErrorException he = (HttpClientErrorException) e;
+                if (he.getStatusCode().value() == 404) {
+                    
+                    re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
+                    return(re);                
+                }
+            }
+
+            if (e instanceof HttpServerErrorException) {
+                HttpServerErrorException he = (HttpServerErrorException) e;
+                logger.info(he.getStatusCode().value());
+                if (he.getStatusCode().value() == 404) {
+                    
+                    re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.NOT_FOUND);
+                    return(re);                
+                }
+
+                returnJson.addProperty("message", he.getResponseBodyAsString());
+            } else {
+                returnJson.addProperty("message", e.getMessage());
+            }
+
+            logger.error(e, e);
+            returnJson.addProperty("status", "ERROR");        
+            re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.INTERNAL_SERVER_ERROR); 
+        }
+
+        return(re);
+    }
+    
     
 
     @GetMapping("/checkAgentSession")
@@ -432,7 +489,7 @@ public class SecureController {
                 HttpClientErrorException he = (HttpClientErrorException) e;
                 if (he.getStatusCode().value() == 404) {
                     
-                    re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.NOT_FOUND);
+                    re = new ResponseEntity<String>(gson.toJson(returnJson), HttpStatus.OK);
                     return(re);                
                 }
             }
